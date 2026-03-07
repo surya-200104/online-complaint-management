@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Staff Dashboard — ResolveIQ</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0d14;--surface:#111520;--card:#161c2e;--border:#1e2740;--accent:#4f8ef7;--green:#10b981;--yellow:#f59e0b;--red:#ef4444;--text:#e2e8f0;--muted:#64748b;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;display:flex;min-height:100vh;}
+.sidebar{width:240px;background:var(--surface);border-right:1px solid var(--border);padding:28px 20px;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:50;}
+.sidebar-logo{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:40px;padding:0 8px;}
+.sidebar-logo span{color:var(--accent);}
+.sidebar-role{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:0 8px;margin-bottom:16px;}
+.nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;cursor:pointer;color:var(--muted);font-size:14px;font-weight:500;margin-bottom:4px;transition:all .2s;border:none;background:none;width:100%;text-align:left;}
+.nav-item:hover,.nav-item.active{background:rgba(79,142,247,.1);color:var(--accent);}
+.sidebar-footer{margin-top:auto;}
+.user-pill{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;}
+.user-pill .uname{font-size:14px;font-weight:600;}
+.user-pill .urole{font-size:12px;color:var(--muted);margin-top:2px;}
+.logout-btn{width:100%;background:transparent;border:1px solid var(--border);color:var(--muted);padding:10px;border-radius:8px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;transition:all .2s;}
+.logout-btn:hover{border-color:var(--red);color:var(--red);}
+.main{margin-left:240px;flex:1;padding:36px 40px;}
+.page-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:32px;}
+.page-title-wrap h1{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;}
+.page-title-wrap p{color:var(--muted);font-size:14px;margin-top:4px;}
+.refresh-btn{background:var(--card);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:8px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;transition:all .2s;}
+.refresh-btn:hover{border-color:var(--accent);color:var(--accent);}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px;}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;}
+.s-label{font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.s-num{font-family:'Syne',sans-serif;font-size:36px;font-weight:800;}
+.s-num.blue{color:var(--accent);} .s-num.green{color:var(--green);} .s-num.yellow{color:var(--yellow);}
+
+/* COMPLAINT CARDS */
+.complaints-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:20px;}
+.c-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;transition:all .3s;}
+.c-card:hover{border-color:rgba(79,142,247,.3);transform:translateY(-2px);}
+.c-card.resolved{opacity:.65;}
+.c-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;}
+.c-id{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--accent);}
+.c-name{font-size:13px;color:var(--muted);margin-top:2px;}
+.status-badge,.priority-badge{display:inline-block;padding:5px 12px;border-radius:100px;font-size:11px;font-weight:600;}
+.s-pending{background:rgba(100,116,139,.15);color:#94a3b8;}
+.s-in-progress,.s-progress{background:rgba(245,158,11,.1);color:var(--yellow);}
+.s-resolved{background:rgba(16,185,129,.1);color:var(--green);}
+.p-high{background:rgba(239,68,68,.1);color:var(--red);}
+.p-medium{background:rgba(245,158,11,.1);color:var(--yellow);}
+.p-low{background:rgba(16,185,129,.1);color:var(--green);}
+.c-body{font-size:14px;color:var(--muted);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px;}
+.c-meta{font-size:12px;color:var(--muted);margin-bottom:16px;display:flex;gap:16px;flex-wrap:wrap;}
+.c-meta span{display:flex;align-items:center;gap:4px;}
+.sla-warn{color:var(--red);}
+.c-footer{border-top:1px solid var(--border);padding-top:16px;}
+.c-footer label{font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:8px;margin-top:12px;}
+.c-footer textarea{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;resize:vertical;min-height:80px;outline:none;}
+.c-footer textarea:focus{border-color:var(--accent);}
+.c-footer select{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;}
+.c-footer select option{background:var(--card);}
+.update-btn{width:100%;background:var(--accent);color:#fff;border:none;padding:12px;border-radius:8px;font-family:'DM Sans',sans-serif;font-weight:600;cursor:pointer;transition:all .2s;margin-top:12px;font-size:14px;}
+.update-btn:hover{background:#3a7de8;}
+.resolved-reply{background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:14px;font-size:13px;color:var(--text);line-height:1.7;}
+.empty-state{text-align:center;padding:80px 40px;color:var(--muted);}
+.empty-icon{font-size:56px;margin-bottom:20px;}
+.empty-state h3{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;color:var(--text);margin-bottom:8px;}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border);color:var(--text);padding:12px 20px;border-radius:10px;font-size:14px;z-index:300;transform:translateY(80px);opacity:0;transition:all .3s;}
+.toast.show{transform:translateY(0);opacity:1;}
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-logo">Resolve<span>IQ</span></div>
+  <div class="sidebar-role">Staff Portal</div>
+  <button class="nav-item active"><span>📋</span> My Complaints</button>
+  <div class="sidebar-footer">
+    <div class="user-pill">
+      <div class="uname" id="sidebarName">Staff</div>
+      <div class="urole">Support Agent</div>
+    </div>
+    <button class="logout-btn" onclick="logout()">Sign Out</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="page-header">
+    <div class="page-title-wrap">
+      <h1>My Complaints</h1>
+      <p id="subTitle">Loading your assigned complaints...</p>
+    </div>
+    <button class="refresh-btn" onclick="loadStaff()">↻ Refresh</button>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card"><div class="s-label">Assigned To Me</div><div class="s-num blue" id="sTotal">—</div></div>
+    <div class="stat-card"><div class="s-label">Pending</div><div class="s-num yellow" id="sPending">—</div></div>
+    <div class="stat-card"><div class="s-label">Resolved</div><div class="s-num green" id="sResolved">—</div></div>
+  </div>
+
+  <div class="complaints-grid" id="complaintsList"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = "http://127.0.0.1:5001";
+const token = localStorage.getItem("token");
+const username = localStorage.getItem("username");
+const fullName = localStorage.getItem("full_name");
+
+if (!token) window.location.href = "login.html";
+document.getElementById("sidebarName").textContent = fullName || username;
+
+function authHeaders() { return {"Content-Type":"application/json","Authorization":`Bearer ${token}`}; }
+
+function showToast(msg, err=false) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.style.borderColor = err?"var(--red)":"var(--green)";
+  t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),3000);
+}
+
+async function loadStaff() {
+  try {
+    const [cRes, sRes] = await Promise.all([
+      fetch(`${API}/api/staff/complaints`, {headers:authHeaders()}),
+      fetch(`${API}/api/staff/stats`, {headers:authHeaders()})
+    ]);
+    if (cRes.status===401) { window.location.href="login.html"; return; }
+    const complaints = await cRes.json();
+    const stats = await sRes.json();
+
+    document.getElementById("sTotal").textContent = stats.total;
+    document.getElementById("sPending").textContent = stats.pending;
+    document.getElementById("sResolved").textContent = stats.resolved;
+    document.getElementById("subTitle").textContent = `${complaints.length} complaint${complaints.length!==1?"s":""} assigned to you`;
+
+    renderComplaints(complaints);
+  } catch(e) {
+    document.getElementById("complaintsList").innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><h3>Connection Error</h3><p>Make sure Flask is running on port 5001</p></div>`;
+  }
+}
+
+function renderComplaints(list) {
+  const el = document.getElementById("complaintsList");
+  if (list.length===0) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🎉</div><h3>All Clear!</h3><p>No complaints assigned to you right now.</p></div>`;
+    return;
+  }
+
+  el.innerHTML = list.map(c => {
+    const now = new Date();
+    const sla = c.sla_deadline ? new Date(c.sla_deadline) : null;
+    const overdue = sla && now > sla && c.status !== "Resolved";
+    const slaText = sla ? `<span class="${overdue?'sla-warn':''}">⏱ ${overdue?"OVERDUE":"SLA"}: ${sla.toLocaleString()}</span>` : "";
+
+    if (c.status === "Resolved") {
+      return `
+      <div class="c-card resolved">
+        <div class="c-header">
+          <div><div class="c-id">#${String(c.id).padStart(5,'0')}</div><div class="c-name">${c.name}</div></div>
+          <span class="status-badge s-resolved">✓ Resolved</span>
+        </div>
+        <div class="c-body">${c.complaint}</div>
+        <div class="c-meta"><span>📁 ${c.category||"General"}</span>${slaText}</div>
+        ${c.reply?`<div class="resolved-reply"><strong style="color:var(--green);font-size:11px;text-transform:uppercase;letter-spacing:.8px;">Your Reply</strong><br>${c.reply}</div>`:""}
+      </div>`;
+    }
+
+    return `
+    <div class="c-card">
+      <div class="c-header">
+        <div><div class="c-id">#${String(c.id).padStart(5,'0')}</div><div class="c-name">${c.name}</div></div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+          <span class="status-badge s-${c.status.toLowerCase().replace(' ','-')}">${c.status}</span>
+          <span class="priority-badge p-${(c.priority||"Medium").toLowerCase()}">${c.priority||"Medium"}</span>
+        </div>
+      </div>
+      <div class="c-body">${c.complaint}</div>
+      <div class="c-meta">
+        <span>📁 ${c.category||"General"}</span>
+        <span>🕐 ${new Date(c.created_at).toLocaleDateString()}</span>
+        ${slaText}
+      </div>
+      <div class="c-footer">
+        <label>Your Reply</label>
+        <textarea id="reply-${c.id}" placeholder="Write your reply to this complaint...">${c.reply||""}</textarea>
+        <label>Update Status</label>
+        <select id="status-${c.id}">
+          <option value="In Progress" ${c.status==="In Progress"?"selected":""}>In Progress</option>
+          <option value="Resolved">Mark as Resolved</option>
+        </select>
+        <button class="update-btn" onclick="staffUpdate(${c.id})">Update Complaint</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function staffUpdate(id) {
+  const status = document.getElementById(`status-${id}`).value;
+  const reply = document.getElementById(`reply-${id}`).value.trim();
+
+  if (status === "Resolved" && !reply) {
+    showToast("Please add a reply before marking as resolved", true); return;
+  }
+
+  try {
+    const res = await fetch(`${API}/api/update/${id}`, {
+      method:"PUT", headers:authHeaders(),
+      body: JSON.stringify({status,reply})
+    });
+    if (res.ok) { showToast(status==="Resolved"?"✓ Complaint resolved!":"✓ Complaint updated"); loadStaff(); }
+    else { const d=await res.json(); showToast(d.error||"Update failed",true); }
+  } catch(e) { showToast("Server error",true); }
+}
+
+function logout() { localStorage.clear(); window.location.href="login.html"; }
+
+loadStaff();
+setInterval(loadStaff, 30000); // Auto-refresh every 30s
+</script>
+</body>
+</html>

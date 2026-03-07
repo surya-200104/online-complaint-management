@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — ResolveIQ</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0d14;--surface:#111520;--card:#161c2e;--border:#1e2740;--accent:#4f8ef7;--text:#e2e8f0;--muted:#64748b;--red:#ef4444;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;}
+.glow{position:fixed;top:0;left:50%;transform:translateX(-50%);width:800px;height:400px;background:radial-gradient(ellipse,rgba(79,142,247,0.12) 0%,transparent 70%);pointer-events:none;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:48px;width:100%;max-width:420px;position:relative;z-index:1;}
+.logo{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;text-align:center;margin-bottom:8px;}
+.logo span{color:var(--accent);}
+.subtitle{text-align:center;color:var(--muted);font-size:14px;margin-bottom:40px;}
+label{display:block;font-size:13px;font-weight:500;color:var(--muted);margin-bottom:6px;letter-spacing:.5px;}
+input{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:12px 16px;border-radius:10px;font-size:14px;font-family:'DM Sans',sans-serif;transition:border .2s;outline:none;margin-bottom:20px;}
+input:focus{border-color:var(--accent);}
+.btn{width:100%;background:var(--accent);color:#fff;border:none;padding:14px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;margin-top:8px;}
+.btn:hover{background:#3a7de8;transform:translateY(-1px);}
+.btn:disabled{opacity:.6;cursor:not-allowed;transform:none;}
+.error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--red);padding:12px 16px;border-radius:8px;font-size:13px;margin-bottom:20px;display:none;}
+.hint{background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.2);border-radius:10px;padding:16px;margin-top:24px;}
+.hint p{font-size:12px;color:var(--muted);line-height:1.8;}
+.hint strong{color:var(--accent);}
+.back-link{display:block;text-align:center;margin-top:20px;color:var(--muted);font-size:13px;text-decoration:none;}
+.back-link:hover{color:var(--accent);}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:8px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="glow"></div>
+<div class="card">
+  <div class="logo">Resolve<span>IQ</span></div>
+  <p class="subtitle">Staff & Admin Portal</p>
+
+  <div class="error" id="errorBox"></div>
+
+  <label>USERNAME</label>
+  <input type="text" id="username" placeholder="Enter username" autocomplete="off">
+
+  <label>PASSWORD</label>
+  <input type="password" id="password" placeholder="Enter password" onkeydown="if(event.key==='Enter')login()">
+
+  <button class="btn" id="loginBtn" onclick="login()">Login</button>
+
+  <div class="hint">
+    <p><strong>Admin:</strong> admin / Admin@1234<br>
+    <strong>Staff:</strong> staff1 / Staff@1234 &nbsp;|&nbsp; staff2 / Staff@1234</p>
+  </div>
+
+  <a href="index.html" class="back-link">← Back to Home</a>
+</div>
+
+<script>
+const API = "http://127.0.0.1:5001";
+
+async function login() {
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value;
+  const btn = document.getElementById("loginBtn");
+  const err = document.getElementById("errorBox");
+
+  err.style.display = "none";
+  if (!username || !password) { showError("Please enter username and password"); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Logging in...';
+
+  try {
+    const res = await fetch(`${API}/api/login`, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({username, password})
+    });
+    const data = await res.json();
+
+    if (!res.ok) { showError(data.error || "Login failed"); btn.disabled=false; btn.innerHTML="Login"; return; }
+
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("role", data.role);
+    localStorage.setItem("username", data.username);
+    localStorage.setItem("full_name", data.full_name);
+
+    window.location.href = data.role === "admin" ? "admin.html" : "staff.html";
+  } catch(e) {
+    showError("Cannot connect to server. Make sure Flask is running.");
+    btn.disabled=false; btn.innerHTML="Login";
+  }
+}
+
+function showError(msg) {
+  const e = document.getElementById("errorBox");
+  e.textContent = msg; e.style.display = "block";
+}
+</script>
+</body>
+</html>
