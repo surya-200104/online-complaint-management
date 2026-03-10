@@ -8,7 +8,7 @@ import os
 from datetime import datetime, timedelta
 
 app = Flask(__name__, static_folder="../frontend", static_url_path="")
-CORS(app, supports_credentials=True, origins=["http://127.0.0.1:5001", "http://localhost:5001"])
+CORS(app, supports_credentials=True, origins="*")
 
 DATABASE = "database.db"
 JWT_SECRET = os.environ.get("JWT_SECRET", "change-this-in-production-use-env-var")
@@ -27,7 +27,6 @@ def init_db():
     conn = connect_db()
     cur = conn.cursor()
 
-    # Users table
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,7 +39,6 @@ def init_db():
         created_at TEXT
     )""")
 
-    # Complaints table
     cur.execute("""
     CREATE TABLE IF NOT EXISTS complaints (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,7 +57,6 @@ def init_db():
         sla_deadline TEXT
     )""")
 
-    # Activity log table
     cur.execute("""
     CREATE TABLE IF NOT EXISTS activity_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,7 +68,6 @@ def init_db():
         FOREIGN KEY(complaint_id) REFERENCES complaints(id) ON DELETE CASCADE
     )""")
 
-    # Seed default admin if not exists
     cur.execute("SELECT id FROM users WHERE username='admin'")
     if not cur.fetchone():
         hashed = bcrypt.hashpw(b"Admin@1234", bcrypt.gensalt()).decode()
@@ -79,7 +75,6 @@ def init_db():
         cur.execute("INSERT INTO users (username,password_hash,role,full_name,email,created_at) VALUES (?,?,?,?,?,?)",
                     ("admin", hashed, "admin", "System Admin", "admin@system.com", now))
 
-    # Seed default staff
     for uname, fname in [("staff1","Alice Johnson"),("staff2","Bob Smith")]:
         cur.execute("SELECT id FROM users WHERE username=?", (uname,))
         if not cur.fetchone():
@@ -147,6 +142,10 @@ def sla_deadline(priority):
 @app.route("/")
 def index():
     return send_from_directory(app.static_folder, "index.html")
+
+@app.route("/<path:filename>")
+def serve_frontend(filename):
+    return send_from_directory(app.static_folder, filename)
 
 # ================= AUTH =================
 
