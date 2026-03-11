@@ -5,7 +5,9 @@ import sqlite3
 import bcrypt
 import jwt
 import os
+import json
 from datetime import datetime, timedelta
+import google.generativeai as genai
 
 app = Flask(__name__, static_folder="../frontend", static_url_path="")
 CORS(app, supports_credentials=True, origins="*")
@@ -13,6 +15,39 @@ CORS(app, supports_credentials=True, origins="*")
 DATABASE = "database.db"
 JWT_SECRET = os.environ.get("JWT_SECRET", "change-this-in-production-use-env-var")
 JWT_EXPIRY_HOURS = 8
+
+# ================= AI SETUP =================
+GEMINI_API_KEY = os.environ.get("AIzaSyA2AGe0_zBEAshAHgUzCkaor3q2JExEKNA")
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel("gemini-2.0-flash")
+
+def analyze_complaint(complaint_text):
+    try:
+        prompt = f"""
+        Analyze this complaint and return ONLY a JSON response:
+        Complaint: "{complaint_text}"
+
+        Return exactly this format:
+        {{
+            "category": "one of: Technical/Billing/Service/General/Infrastructure",
+            "priority": "one of: High/Medium/Low",
+            "sentiment": "one of: Angry/Neutral/Satisfied",
+            "summary": "one line summary under 15 words",
+            "suggested_reply": "a professional reply under 30 words"
+        }}
+        """
+        response = model.generate_content(prompt)
+        text = response.text.strip()
+        text = text.replace("```json", "").replace("```", "").strip()
+        return json.loads(text)
+    except Exception as e:
+        return {
+            "category": "General",
+            "priority": "Medium",
+            "sentiment": "Neutral",
+            "summary": complaint_text[:50],
+            "suggested_reply": "Thank you for your complaint. We will resolve it shortly."
+        }
 
 # ================= DATABASE =================
 
@@ -54,7 +89,10 @@ def init_db():
         created_at TEXT,
         updated_at TEXT,
         resolved_at TEXT,
-        sla_deadline TEXT
+        sla_deadline TEXT,
+        sentiment TEXT DEFAULT 'Neutral',
+        ai_summary TEXT DEFAULT '',
+        suggested_reply TEXT DEFAULT ''
     )""")
 
     cur.execute("""
@@ -147,6 +185,17 @@ def index():
 def serve_frontend(filename):
     return send_from_directory(app.static_folder, filename)
 
+# ================= AI ANALYSIS =================
+
+@app.route("/api/analyze", methods=["POST"])
+def analyze():
+    data = request.get_json()
+    complaint_text = data.get("complaint", "")
+    if not complaint_text:
+        return jsonify({"error": "Complaint text required"}), 400
+    result = analyze_complaint(complaint_text)
+    return jsonify(result)
+
 # ================= AUTH =================
 
 @app.route("/api/login", methods=["POST"])
@@ -195,26 +244,45 @@ def submit():
     if not name or not complaint:
         return jsonify({"error": "Name and complaint are required"}), 400
 
+    # AI Analysis
+    ai_result = analyze_complaint(complaint)
+    category = ai_result.get("category", category)
+    priority = ai_result.get("priority", priority)
+    sentiment = ai_result.get("sentiment", "Neutral")
+    summary = ai_result.get("summary", "")
+    suggested_reply = ai_result.get("suggested_reply", "")
+
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     deadline = sla_deadline(priority)
 
     conn = connect_db()
     cur = conn.cursor()
     cur.execute("""
-        INSERT INTO complaints (name,email,phone,category,priority,complaint,status,reply,assigned_to,created_at,updated_at,sla_deadline)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-    """, (name, email, phone, category, priority, complaint, "Pending", "", "Not Assigned", now, now, deadline))
+        INSERT INTO complaints (name,email,phone,category,priority,complaint,status,reply,assigned_to,created_at,updated_at,sla_deadline,sentiment,ai_summary,suggested_reply)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    """, (name, email, phone, category, priority, complaint, "Pending", "", "Not Assigned", now, now, deadline, sentiment, summary, suggested_reply))
     cid = cur.lastrowid
-    log_activity(conn, cid, "SUBMITTED", name, f"Priority: {priority}, Category: {category}")
+    log_activity(conn, cid, "SUBMITTED", name, f"Priority: {priority}, Category: {category}, Sentiment: {sentiment}")
     conn.commit()
     conn.close()
-    return jsonify({"message": "Complaint submitted successfully", "id": cid, "sla_deadline": deadline})
+    return jsonify({
+        "message": "Complaint submitted successfully",
+        "id": cid,
+        "sla_deadline": deadline,
+        "ai_analysis": {
+            "category": category,
+            "priority": priority,
+            "sentiment": sentiment,
+            "summary": summary,
+            "suggested_reply": suggested_reply
+        }
+    })
 
 @app.route("/api/status/<int:cid>")
 def status(cid):
     conn = connect_db()
     cur = conn.cursor()
-    cur.execute("SELECT id,name,category,priority,complaint,status,reply,assigned_to,created_at,updated_at,resolved_at,sla_deadline FROM complaints WHERE id=?", (cid,))
+    cur.execute("SELECT id,name,category,priority,complaint,status,reply,assigned_to,created_at,updated_at,resolved_at,sla_deadline,sentiment,ai_summary FROM complaints WHERE id=?", (cid,))
     row = cur.fetchone()
     conn.close()
     if not row:
@@ -271,13 +339,17 @@ def admin_stats():
     """)
     daily = [dict(r) for r in cur.fetchall()]
 
+    cur.execute("SELECT sentiment, COUNT(*) as count FROM complaints GROUP BY sentiment")
+    by_sentiment = [dict(r) for r in cur.fetchall()]
+
     conn.close()
     return jsonify({
         "total": total, "pending": pending,
         "in_progress": in_progress, "resolved": resolved,
         "high_priority": high_priority,
         "by_staff": by_staff, "by_category": by_category,
-        "daily_trend": daily
+        "daily_trend": daily,
+        "by_sentiment": by_sentiment
     })
 
 @app.route("/api/admin/staff-list")
