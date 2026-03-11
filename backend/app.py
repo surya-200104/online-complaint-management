@@ -6,8 +6,8 @@ import bcrypt
 import jwt
 import os
 import json
+import requests
 from datetime import datetime, timedelta
-import google.generativeai as genai
 
 app = Flask(__name__, static_folder="../frontend", static_url_path="")
 CORS(app, supports_credentials=True, origins="*")
@@ -15,29 +15,33 @@ CORS(app, supports_credentials=True, origins="*")
 DATABASE = "database.db"
 JWT_SECRET = os.environ.get("JWT_SECRET", "change-this-in-production-use-env-var")
 JWT_EXPIRY_HOURS = 8
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 # ================= AI SETUP =================
-GEMINI_API_KEY = os.environ.get("AIzaSyA2AGe0_zBEAshAHgUzCkaor3q2JExEKNA")
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-2.0-flash")
 
 def analyze_complaint(complaint_text):
     try:
-        prompt = f"""
-        Analyze this complaint and return ONLY a JSON response:
-        Complaint: "{complaint_text}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+        payload = {
+            "contents": [{
+                "parts": [{
+                    "text": f"""Analyze this complaint and return ONLY a JSON response:
+Complaint: "{complaint_text}"
 
-        Return exactly this format:
-        {{
-            "category": "one of: Technical/Billing/Service/General/Infrastructure",
-            "priority": "one of: High/Medium/Low",
-            "sentiment": "one of: Angry/Neutral/Satisfied",
-            "summary": "one line summary under 15 words",
-            "suggested_reply": "a professional reply under 30 words"
-        }}
-        """
-        response = model.generate_content(prompt)
-        text = response.text.strip()
+Return exactly this format:
+{{
+    "category": "one of: Technical/Billing/Service/General/Infrastructure",
+    "priority": "one of: High/Medium/Low",
+    "sentiment": "one of: Angry/Neutral/Satisfied",
+    "summary": "one line summary under 15 words",
+    "suggested_reply": "a professional reply under 30 words"
+}}"""
+                }]
+            }]
+        }
+        response = requests.post(url, json=payload)
+        result = response.json()
+        text = result["candidates"][0]["content"]["parts"][0]["text"]
         text = text.replace("```json", "").replace("```", "").strip()
         return json.loads(text)
     except Exception as e:
@@ -244,7 +248,6 @@ def submit():
     if not name or not complaint:
         return jsonify({"error": "Name and complaint are required"}), 400
 
-    # AI Analysis
     ai_result = analyze_complaint(complaint)
     category = ai_result.get("category", category)
     priority = ai_result.get("priority", priority)
@@ -455,3 +458,5 @@ def staff_stats():
 
 if __name__ == "__main__":
     app.run(debug=False, port=5001)
+
+
