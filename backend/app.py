@@ -110,6 +110,20 @@ def init_db():
         FOREIGN KEY(complaint_id) REFERENCES complaints(id) ON DELETE CASCADE
     )""")
 
+    # Migration - add AI columns if not exists
+    try:
+        cur.execute("ALTER TABLE complaints ADD COLUMN sentiment TEXT DEFAULT 'Neutral'")
+    except:
+        pass
+    try:
+        cur.execute("ALTER TABLE complaints ADD COLUMN ai_summary TEXT DEFAULT ''")
+    except:
+        pass
+    try:
+        cur.execute("ALTER TABLE complaints ADD COLUMN suggested_reply TEXT DEFAULT ''")
+    except:
+        pass
+
     cur.execute("SELECT id FROM users WHERE username='admin'")
     if not cur.fetchone():
         hashed = bcrypt.hashpw(b"Admin@1234", bcrypt.gensalt()).decode()
@@ -458,5 +472,3 @@ def staff_stats():
 
 if __name__ == "__main__":
     app.run(debug=False, port=5001)
-
-
